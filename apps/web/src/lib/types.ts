@@ -1,0 +1,15 @@
+export type User = { id: string; name: string; email: string; role: 'USER' | 'ADMIN'; createdAt: string; isDemo?: boolean };
+export type List<T> = { items: T[]; nextCursor: string | null };
+export type Capability = { classification: boolean; segmentation: boolean; quality: boolean; offlineInference: boolean; modelStatus: string; message: string; classes: string[]; smtp: boolean; aiReview?: boolean; externalAiRequired?: boolean; provider?: string };
+export type Roi = { x: number; y: number; width: number; height: number };
+export type Quality = { decision: 'PASS' | 'WARN' | 'REJECT'; assessmentComplete: boolean; checks: { code: string; status: string; value?: number; message: string }[] };
+export type MedicalImage = { id: string; width: number; height: number; byteSize: number; mimeType: string; quality: Quality | null; roi: Roi | null };
+export type Answer = 'YES' | 'NO' | 'UNKNOWN';
+export type Symptoms = { duration: 'DAYS' | 'WEEKS' | 'MONTHS' | 'YEARS' | 'UNKNOWN'; itching: Answer; pain: Answer; bleeding: Answer; changing: Answer; asymmetry: Answer; border: Answer; color: Answer; diameterMm?: number | null; notes?: string };
+export type Case = { id: string; label: string; bodyLocation: string; createdAt: string; updatedAt: string; analyses?: Analysis[]; _count?: { analyses: number } };
+export type Consent = { processing: boolean; history: boolean; research: boolean; externalAi?: boolean };
+export type Differential = { classCode: 'SUSPICIOUS_PIGMENTED' | 'NEVUS' | 'ECZEMA_DERMATITIS' | 'PSORIASIS' | 'ACNE' | 'FUNGAL_INFECTION' | 'OTHER'; condition: string; supportingFeatures: string[]; uncertainties: string[] };
+export type Result = { predictions: { classCode: string; score: number | null; scoreType: string }[]; riskLevel: string; malignantProbability: number | null; uncertaintyReasons: string[]; recommendation: string; modelVersion: string | null; maskAssetId?: string; heatmapAssetId?: string; summary?: string; observations?: string[]; limitations?: string[]; provider?: string | { name: string; model?: string }; primaryImageId?: string; aggregationMethod?: string; imageResults?: { imageId: string; inferencePerformed: boolean; reason: string }[]; differential?: Differential[]; nextSteps?: string[]; followUpQuestions?: string[]; imageAssessment?: { skinVisible: boolean; imageSuitable: boolean; reason: string }; analysisMode?: 'VISUAL_DIFFERENTIAL' };
+export type Analysis = { id: string; caseId: string; createdAt: string; updatedAt: string; expiresAt: string | null; retentionMode: string; processingStatus: 'DRAFT' | 'QUEUED' | 'RUNNING' | 'FINISHED' | 'FAILED' | 'CANCELLED'; outcome: string | null; failureCode: string | null; stage: string | null; case?: Case; images: MedicalImage[]; symptoms: Symptoms | null; consents: Consent; result: Result | null; isDemo?: boolean };
+export type Receipt = { id: string; status: string; createdAt?: string; completedAt?: string };
+export type Session = { id: string; createdAt: string; expiresAt: string; current: boolean };

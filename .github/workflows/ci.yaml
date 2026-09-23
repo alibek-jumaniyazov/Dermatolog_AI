@@ -1,0 +1,135 @@
+name: Software checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.5
+        env: {POSTGRES_USER: derma, POSTGRES_PASSWORD: ci-only-password, POSTGRES_DB: dermatolog}
+        ports: ['55439:5432']
+        options: --health-cmd "pg_isready -U derma" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://derma:ci-only-password@127.0.0.1:55439/dermatolog
+      NODE_ENV: development
+      HOST: 127.0.0.1
+      PORT: '3001'
+      APP_ORIGIN: http://localhost:5173
+      TEST_API_URL: http://127.0.0.1:3001/api/v1
+      TEST_WEB_URL: http://localhost:5173
+      ML_SERVICE_URL: http://127.0.0.1:8001
+      AI_PROVIDER: local
+      OPENAI_API_KEY: ''
+      ML_MODEL_MANIFEST: /tmp/rd-ci-no-model/manifest.json
+      ML_TRUSTED_ARTIFACT_SHA256: ''
+      STORAGE_DRIVER: local
+      STORAGE_PATH: .data/ci-storage
+      REDIS_URL: ''
+      RUN_WORKER_IN_API: 'true'
+      WORKER_ONLY: 'false'
+      SMTP_HOST: ''
+      TEMP_RETENTION_MINUTES: '60'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.18.0}
+      - run: npm install -g pnpm@11.19.0
+      - run: pnpm install --frozen-lockfile
+      - name: Generate isolated test credentials
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto';
+          import { appendFileSync, mkdirSync } from 'node:fs';
+          for (const name of ['JWT_SECRET', 'REFRESH_SECRET', 'ML_SERVICE_TOKEN']) {
+            const value = randomBytes(32).toString('hex');
+            console.log(`::add-mask::${value}`);
+            appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`);
+          }
+          mkdirSync('.data/logs', { recursive: true });
+          mkdirSync('.data/ci-pids', { recursive: true });
+          NODE
+      - run: pnpm db:migrate
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -r services/ml/requirements-dev.txt
+      - run: python -m pytest services/ml/tests -q
+      - name: Install Chromium and system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Start local services without an external AI provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          setsid nohup python -m uvicorn app.main:app --app-dir services/ml --host 127.0.0.1 --port 8001 --no-access-log > .data/logs/ci-ml.log 2>&1 &
+          echo "$!" > .data/ci-pids/ml.pid
+          setsid nohup node apps/api/dist/main.js > .data/logs/ci-api.log 2>&1 &
+          echo "$!" > .data/ci-pids/api.pid
+          setsid nohup node apps/web/node_modules/vite/bin/vite.js apps/web --config apps/web/vite.config.ts --host localhost --port 5173 --strictPort > .data/logs/ci-web.log 2>&1 &
+          echo "$!" > .data/ci-pids/web.pid
+      - name: Wait for readiness with a bounded deadline
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { setTimeout as delay } from 'node:timers/promises';
+          const urls = [
+            'http://127.0.0.1:8001/health/ready',
+            'http://127.0.0.1:3001/api/v1/health/ready',
+            'http://localhost:5173',
+          ];
+          const deadline = Date.now() + 90_000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            const states = await Promise.all(urls.map(async url => {
+              try { return (await fetch(url, { signal: AbortSignal.timeout(2000) })).ok; }
+              catch { return false; }
+            }));
+            if (states.every(Boolean)) { ready = true; break; }
+            await delay(1000);
+          }
+          if (!ready) throw new Error('Local services did not become ready within 90 seconds; inspect CI service logs.');
+          const response = await fetch('http://127.0.0.1:3001/api/v1/capabilities', { signal: AbortSignal.timeout(5000) });
+          if (!response.ok) throw new Error('Capability check failed.');
+          const capabilities = await response.json();
+          if (capabilities.provider !== 'local' || capabilities.externalAiRequired || capabilities.aiReview) {
+            throw new Error('CI must not enable an external or paid AI provider.');
+          }
+          console.log('API, ML quality and web ready; external AI disabled.');
+          NODE
+      - name: Run real local integration checks
+        run: node scripts/integration-test.mjs
+      - name: Seed and verify local demo fixtures
+        run: |
+          pnpm db:seed
+          pnpm test:demo-seed
+          pnpm test:demo
+      - name: Run basic browser flows on Chromium desktop and mobile
+        # upload.spec.ts requires the separately authorized OpenAI flow; never invoke it in this no-key CI job.
+        run: pnpm exec playwright test tests/e2e/app.spec.ts tests/e2e/demo.spec.ts
+      - name: Stop only the service groups started by this job
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for record in .data/ci-pids/*.pid; do
+            pid=$(cat "$record")
+            if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+              kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+            fi
+          done
+      - name: Upload logs and browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-check-failure-evidence
+          path: |
+            .data/logs/ci-*.log
+            playwright-report/
+            test-results/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7

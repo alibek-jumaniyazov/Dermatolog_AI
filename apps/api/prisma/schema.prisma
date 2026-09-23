@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String @id @default(uuid()) @db.Uuid
+  email        String @unique
+  name         String
+  passwordHash String
+  role         String @default("USER")
+  isDemo       Boolean @default(false)
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  sessions     Session[]
+  resetTokens  ResetToken[]
+  cases        Case[]
+  analyses     Analysis[]
+}
+
+model Session {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  @@index([userId])
+}
+
+model ResetToken {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+}
+
+model Case {
+  id           String @id @default(uuid()) @db.Uuid
+  userId       String @db.Uuid
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  bodyLocation String
+  retained     Boolean @default(false)
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  analyses     Analysis[]
+  updatedAt    DateTime @updatedAt
+  @@index([userId, createdAt])
+}
+
+model Analysis {
+  id                 String @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  user               User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caseId             String @db.Uuid
+  case               Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  status             String @default("DRAFT")
+  isDemo             Boolean @default(false)
+  inputRevision      Int @default(1)
+  processingConsent  Boolean @default(false)
+  historyConsent     Boolean @default(false)
+  researchConsent    Boolean @default(false)
+  externalAiConsent  Boolean @default(false)
+  consentVersion     String @default("2026-09-23")
+  consentedAt        DateTime?
+  expiresAt          DateTime?
+  symptoms           Json?
+  result             Json?
+  riskLevel          String @default("NOT_ASSESSED")
+  errorCode          String?
+  errorMessage       String?
+  primaryImageId     String?
+  captureNotes       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  submittedAt        DateTime?
+  completedAt        DateTime?
+  deletedAt          DateTime?
+  images             Image[]
+  jobs               AnalysisJob[]
+  consentEvents      ConsentEvent[]
+  artifacts          Artifact[]
+  submissions        SubmissionRequest[]
+  @@index([userId, historyConsent, createdAt])
+  @@index([expiresAt, deletedAt])
+}
+
+model Image {
+  id           String @id @default(uuid()) @db.Uuid
+  analysisId   String @db.Uuid
+  analysis     Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  storageKey   String @unique
+  mimeType     String @default("image/jpeg")
+  byteSize     Int
+  width        Int
+  height       Int
+  sha256       String
+  transform    Json
+  roi          Json?
+  quality      Json?
+  selected     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  @@index([analysisId])
+}
+
+model ConsentEvent {
+  id          String @id @default(uuid()) @db.Uuid
+  analysisId  String @db.Uuid
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  processing  Boolean
+  history     Boolean
+  research    Boolean
+  externalAi  Boolean @default(false)
+  version     String
+  createdAt   DateTime @default(now())
+}
+
+model Artifact {
+  id         String @id @default(uuid()) @db.Uuid
+  analysisId String @db.Uuid
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  kind       String
+  storageKey String @unique
+  mimeType   String
+  createdAt  DateTime @default(now())
+  @@unique([analysisId, kind])
+}
+
+model SubmissionRequest {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @db.Uuid
+  key        String
+  bodyHash   String
+  analysisId String @db.Uuid
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  @@unique([userId, key])
+}
+
+model AnalysisJob {
+  id           String @id @default(uuid()) @db.Uuid
+  analysisId   String @db.Uuid
+  analysis     Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  revision     Int
+  status       String @default("PENDING")
+  attempts     Int @default(0)
+  leasedUntil  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@unique([analysisId, revision])
+  @@index([status, leasedUntil])
+}
+
+model DeletionRequest {
+  id          String @id @default(uuid()) @db.Uuid
+  userId      String @db.Uuid
+  scope       String
+  targetId    String?
+  status      String @default("PENDING")
+  storageKeys Json
+  attempts    Int @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model AuditEvent {
+  id        String @id @default(uuid()) @db.Uuid
+  actorId   String?
+  action    String
+  targetId  String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}

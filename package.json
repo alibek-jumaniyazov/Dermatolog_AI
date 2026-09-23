@@ -1,0 +1,45 @@
+{
+  "name": "raqamli-dermatolog",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
+    "dev": "node scripts/dev.mjs",
+    "db:start": "node scripts/postgres.mjs start",
+    "db:stop": "node scripts/postgres.mjs stop",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "node scripts/seed.mjs",
+    "demo:assets": "node scripts/generate-demo-assets.mjs",
+    "test:demo": "node scripts/verify-demo.mjs",
+    "test:demo-seed": "node scripts/check-demo-seed.mjs",
+    "test:demo-ui": "playwright test tests/e2e/demo.spec.ts",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:integration": "node scripts/integration-test.mjs",
+    "test:privacy": "node scripts/privacy-integration.mjs",
+    "test:offline": "node scripts/offline-test.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "test:e2e": "playwright test",
+    "test:smoke": "node scripts/smoke.mjs",
+    "models:check": "node scripts/models-check.mjs",
+    "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm test:integration",
+    "verify:ml": "node scripts/models-check.mjs --require-ready",
+    "setup:ml": "node scripts/setup-ml.mjs",
+    "setup:mail": "node scripts/setup-mail.mjs",
+    "start:local": "node scripts/start-local.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.1",
+    "@types/pg": "8.15.5",
+    "dotenv": "17.2.2",
+    "pg": "8.16.3",
+    "sharp": "0.34.3",
+    "typescript": "5.9.2"
+  }
+}

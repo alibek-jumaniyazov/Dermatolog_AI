@@ -1,0 +1,7 @@
+# Optional heavy research environment. Not installed by default or needed for OpenAI observations.
+torch==2.14.0
+torchvision==0.29.0
+scikit-learn==1.9.1
+onnx==1.23.0
+onnxruntime==1.30.0
+# Install services/ml/requirements.txt first. For CPU wheels use PyTorch's official CPU index.

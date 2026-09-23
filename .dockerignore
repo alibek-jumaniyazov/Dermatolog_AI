@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.git
+.data
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+test-results
+playwright-report
+ml/data/raw
+ml/artifacts/*
+*.docx

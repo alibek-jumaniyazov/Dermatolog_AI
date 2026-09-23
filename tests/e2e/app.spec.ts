@@ -1,0 +1,33 @@
+import {test,expect} from '@playwright/test';
+import crypto from 'node:crypto';
+
+test('registration, privacy defaults, dashboard and settings on real backend',async({page},info)=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/');
+  await expect(page).toHaveTitle(/Raqamli Dermatolog/i);
+  await page.screenshot({path:`test-results/landing-${info.project.name}.png`,fullPage:true});
+  await page.goto('/register');
+  const email=`browser-${Date.now()}-${crypto.randomBytes(4).toString('hex')}@example.com`;
+  const password=`Browser-${crypto.randomBytes(16).toString('hex')}`;
+  await page.getByLabel('Ismingiz',{exact:true}).fill('Browser Test');
+  await page.getByLabel('Email manzili',{exact:true}).fill(email);
+  await page.getByLabel('Parol',{exact:true}).fill(password);
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Hisob yaratish'}).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('heading',{name:/Salom, Browser/})).toBeVisible();
+  await page.screenshot({path:`test-results/dashboard-${info.project.name}.png`,fullPage:true});
+  await page.goto('/app/analyses/new');
+  await expect(page.getByRole('heading',{name:/Teringizga bir oz e’tibor/}).first()).toBeVisible();
+  for(const checkbox of await page.getByRole('checkbox').all()) await expect(checkbox).not.toBeChecked();
+  await page.screenshot({path:`test-results/wizard-${info.project.name}.png`,fullPage:true});
+  await page.goto('/app/settings');
+  await expect(page.getByRole('heading',{name:/Sozlamalar|Shaxsiy sozlamalar/}).first()).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= window.innerWidth+1)).toBeTruthy();
+  await page.screenshot({path:`test-results/settings-${info.project.name}.png`,fullPage:true});
+  expect(errors).toEqual([]);
+  const login=await page.request.post('/api/v1/auth/login',{data:{email,password},headers:{Origin:'http://localhost:5173'}});
+  const data=await login.json();
+  const deletion=await page.request.delete('/api/v1/me',{data:{password},headers:{Origin:'http://localhost:5173',Authorization:`Bearer ${data.accessToken}`}});
+  expect([200,201,202]).toContain(deletion.status());
+});
