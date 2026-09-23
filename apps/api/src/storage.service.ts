@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadBucketCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { mkdir, readFile, writeFile, unlink, access, readdir, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
@@ -7,9 +7,18 @@ import { randomUUID } from 'node:crypto';
 import { config } from './config';
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleInit, OnApplicationShutdown {
   private readonly s3 = process.env.STORAGE_DRIVER === 's3' ? new S3Client({ region: process.env.S3_REGION || 'us-east-1', endpoint: process.env.S3_ENDPOINT, forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY || '', secretAccessKey: process.env.S3_SECRET_KEY || '' } }) : null;
   private readonly bucket = process.env.S3_BUCKET || 'dermatolog-private';
+  async onModuleInit() { await this.ready(); }
+  onApplicationShutdown() { this.s3?.destroy(); }
+  private async localDirectory() {
+    await mkdir(config.storagePath, { recursive: true, mode: 0o700 });
+    if (config.production && process.platform !== 'win32') {
+      const directory = await stat(config.storagePath);
+      if ((directory.mode & 0o077) !== 0) throw new Error('Production storage directory must have private permissions (0700).');
+    }
+  }
   key(extension: 'jpg' | 'png' | 'pdf') { return `${randomUUID()}.${extension}`; }
   private path(key: string) {
     if (!/^[a-f0-9-]+\.(jpg|png|pdf)$/.test(key)) throw new Error('Invalid private storage key');
@@ -19,7 +28,7 @@ export class StorageService {
   }
   async put(key: string, data: Buffer, mimeType: string) {
     if (this.s3) { await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data, ContentType: mimeType, ServerSideEncryption: process.env.S3_ENCRYPTION === 'AES256' ? 'AES256' : undefined })); return; }
-    await mkdir(config.storagePath, { recursive: true });
+    await this.localDirectory();
     await writeFile(this.path(key), data, { flag: 'wx', mode: 0o600 });
   }
   async read(key: string): Promise<Buffer> {
@@ -36,7 +45,7 @@ export class StorageService {
   }
   async ready() {
     if (this.s3) await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    else { await mkdir(config.storagePath, { recursive: true }); await access(config.storagePath, constants.W_OK | constants.R_OK); }
+    else { await this.localDirectory(); await access(config.storagePath, constants.W_OK | constants.R_OK); }
     return true;
   }
   async *staleKeys(before: Date): AsyncGenerator<string[]> {
@@ -49,7 +58,7 @@ export class StorageService {
       } while (continuation);
       return;
     }
-    await mkdir(config.storagePath, { recursive: true });
+    await this.localDirectory();
     let batch: string[] = [];
     for (const entry of await readdir(config.storagePath, { withFileTypes: true })) {
       if (!entry.isFile() || !/^[a-f0-9-]+\.(jpg|png|pdf)$/.test(entry.name)) continue;

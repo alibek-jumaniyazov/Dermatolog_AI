@@ -1,0 +1,12 @@
+[Unit]
+Description=Dermatolog AI readiness check (no external AI inference)
+[Service]
+Type=oneshot
+User=dermatologai
+WorkingDirectory=/opt/dermatologai/current
+ExecStart=/usr/bin/node scripts/production-health.mjs
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+LogNamespace=dermatologai

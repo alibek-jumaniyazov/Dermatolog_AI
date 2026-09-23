@@ -4,7 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { config } from './config';
 import { PrismaService } from './prisma.service';
 import { AuthGuard, AuthService } from './auth.service';
-import { RateGuard } from './common';
+import { RateGuard } from './rate.guard';
+import { RateLimitService } from './rate-limit.service';
 import { AuthController, ProfileController } from './auth.controller';
 import { StorageService } from './storage.service';
 import { MlService } from './ml.service';
@@ -18,7 +19,7 @@ import { SystemController } from './system.controller';
 @Module({
   imports: [JwtModule.register({ secret: config.jwtSecret, signOptions: { expiresIn: '10m', algorithm: 'HS256', issuer: 'raqmli-dermatolog', audience: 'dermatolog-web' }, verifyOptions: { algorithms: ['HS256'], issuer: 'raqmli-dermatolog', audience: 'dermatolog-web' } })],
   controllers: [AuthController, ProfileController, CasesController, AnalysesController, AssetsController, PrivacyController, SystemController],
-  providers: [PrismaService, AuthService, StorageService, MlService, DeletionService, AnalysesService, ReportsService, JobsService, ProcessingConsentGuard,
+  providers: [PrismaService, AuthService, StorageService, MlService, DeletionService, AnalysesService, ReportsService, JobsService, ProcessingConsentGuard, RateLimitService,
     { provide: APP_GUARD, useClass: RateGuard }, { provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

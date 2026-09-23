@@ -21,6 +21,8 @@ export function pnpm(args, options = {}) {
   const candidates = [path.join(root, 'node_modules/pnpm/bin/pnpm.cjs'), ...(win ? [path.join(process.env.LOCALAPPDATA || '', 'pnpm/pnpm.cjs')] : [])];
   const file = candidates.find(p => fs.existsSync(p));
   if (file) return run(process.execPath, [file, ...args], options);
+  const corepack = path.join(path.dirname(process.execPath), 'node_modules/corepack/dist/pnpm.js');
+  if (fs.existsSync(corepack)) return run(process.execPath, [corepack, ...args], options);
   return run(win ? 'pnpm.cmd' : 'pnpm', args, { ...options, shell: win });
 }
 

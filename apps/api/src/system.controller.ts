@@ -5,16 +5,17 @@ import { Public, Admin } from './common';
 import { PrismaService } from './prisma.service';
 import { StorageService } from './storage.service';
 import { MlService } from './ml.service';
+import { RateLimitService } from './rate-limit.service';
 
 @ApiTags('Health') @Controller()
 export class SystemController {
-  constructor(private readonly db: PrismaService, private readonly storage: StorageService, private readonly ml: MlService) {}
+  constructor(private readonly db: PrismaService, private readonly storage: StorageService, private readonly ml: MlService, private readonly limiter: RateLimitService) {}
   @Public() @Get('health/live') live() { return { status: 'ok' }; }
   @Public() @Get('health/ready') async ready(@Res({ passthrough: true }) res: Response) {
-    const [database, storage, ml] = await Promise.allSettled([this.db.$queryRaw`SELECT 1`, this.storage.ready(), this.ml.capabilities()]);
-    const ready = database.status === 'fulfilled' && storage.status === 'fulfilled';
+    const [database, storage, ml, rateLimit] = await Promise.allSettled([this.db.$queryRaw`SELECT 1`, this.storage.ready(), this.ml.capabilities(), this.limiter.ready()]);
+    const ready = database.status === 'fulfilled' && storage.status === 'fulfilled' && rateLimit.status === 'fulfilled';
     if (!ready) res.status(503);
-    return { status: ready ? 'ok' : 'unavailable', database: database.status === 'fulfilled' ? 'ok' : 'unavailable', storage: storage.status === 'fulfilled' ? 'ok' : 'unavailable', ml: ml.status === 'fulfilled' ? ml.value.modelStatus : 'UNAVAILABLE' };
+    return { status: ready ? 'ok' : 'unavailable', database: database.status === 'fulfilled' ? 'ok' : 'unavailable', storage: storage.status === 'fulfilled' ? 'ok' : 'unavailable', rateLimit: rateLimit.status === 'fulfilled' ? 'ok' : 'unavailable', ml: ml.status === 'fulfilled' ? ml.value.modelStatus : 'UNAVAILABLE' };
   }
   @Public() @Get('capabilities') capabilities() { return this.ml.capabilities(); }
   @Admin() @ApiBearerAuth() @Get('admin/system') async admin() {

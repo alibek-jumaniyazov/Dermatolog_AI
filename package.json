@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.18 <23 || >=24"
   },
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
@@ -27,6 +27,10 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "test:e2e": "playwright test",
     "test:smoke": "node scripts/smoke.mjs",
+    "test:seo": "pnpm --filter @derma/web test:seo",
+    "test:seo:browser": "pnpm --filter @derma/web test:seo:browser",
+    "production:check": "node scripts/production-preflight.mjs --template",
+    "test:production": "node scripts/production-static-test.mjs && node scripts/production-backup-test.mjs",
     "models:check": "node scripts/models-check.mjs",
     "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm test:integration",
     "verify:ml": "node scripts/models-check.mjs --require-ready",
@@ -39,7 +43,7 @@
     "@types/pg": "8.15.5",
     "dotenv": "17.2.2",
     "pg": "8.16.3",
-    "sharp": "0.34.3",
+    "sharp": "0.35.4",
     "typescript": "5.9.2"
   }
 }

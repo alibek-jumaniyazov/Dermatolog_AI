@@ -78,7 +78,9 @@ export class AuthService {
     if (user && !user.deletedAt && !(config.production && user.isDemo)) {
       const token = randomBytes(48).toString('base64url');
       const reset = await this.db.resetToken.create({ data: { userId: user.id, tokenHash: hash(token), expiresAt: new Date(Date.now() + 30 * 60000) } });
-      const transport = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', ...(process.env.SMTP_USER ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } } : {}) });
+      const transport = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', requireTLS: config.smtpRequireTls,
+        connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000, tls: { minVersion: 'TLSv1.2', rejectUnauthorized: true },
+        ...(process.env.SMTP_USER ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } } : {}) });
       try {
         await transport.sendMail({ from: process.env.SMTP_FROM || 'noreply@localhost', to: user.email, subject: 'Raqamli Dermatolog — parolni tiklash', text: `Parolingizni 30 daqiqa ichida ushbu havola orqali yangilang: ${config.origin}/reset-password?token=${encodeURIComponent(token)}\nAgar so‘rovni siz yubormagan bo‘lsangiz, xatni e’tiborsiz qoldiring.` });
       } catch {

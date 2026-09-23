@@ -6,7 +6,11 @@ Ilova surat olish/yuklash, texnik sifat tekshiruvi, simptomlar, shaxsiy tarix, v
 
 ## Windowsda lokal ishga tushirish
 
-Talablar: Node.js 22.18+, pnpm 11.19, PostgreSQL 17 binarlari va Python 3.12+. `PG_BIN` va `PYTHON_BIN` kerak bo‘lsa `.env`da sozlanadi. Mavjud PostgreSQL bazasiga tegilmaydi: loyiha `.data/postgres` ichida, `127.0.0.1:55439` portida alohida cluster ishlatadi.
+Joriy loyiha papkasi: `C:\Users\Lokaydo\Desktop\Loyiha 1\Dermatolog_AI`. Shu papkadagi **`START.cmd`** faylini oching: kerakli lokal sozlamalar, migratsiya, build va yashirin servislar avtomatik ishga tushadi. Tayyor bo‘lgach [localhost:5173](http://localhost:5173) ochiladi. **`STOP.cmd`** ilova servislarini to‘xtatadi; PostgreSQL alohida `pnpm db:stop` bilan to‘xtatiladi. Qayta ishga tushirish demo ma’lumotlarni o‘chirmaydi va seedni avtomatik takrorlamaydi.
+
+Talablar: Node.js 22.18–22.x yoki 24+, pnpm 11.19, PostgreSQL 17 binarlari va Python 3.12+. `PG_BIN` va `PYTHON_BIN` kerak bo‘lsa `.env`da sozlanadi. Loyiha `.data/postgres` ichida, `127.0.0.1:55439` portida alohida cluster ishlatadi. Docker talab qilinmaydi.
+
+Qo‘lda birinchi o‘rnatish yoki terminaldan ishga tushirish:
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -25,7 +29,7 @@ pnpm start:local
 
 Brauzerda yangi hisob yarating yoki `pnpm db:seed` orqali demo hisoblar va namunaviy tarixni qo‘shing. Demo login-parollari va qayta bajarish tartibi [DEMO_DATA.md](docs/DEMO_DATA.md)da. Seed faqat lokal development bazada ishlaydi; unda haqiqiy bemor ma’lumotlari yo‘q. Lokal password reset xati Mailpitga tushadi va tashqi emailga yuborilmaydi. `Ctrl+C` web/API/ML/mail xizmatlarini to‘xtatadi; bazani alohida `pnpm db:stop` bilan to‘xtating. Ma’lumotlar `.data`da qoladi.
 
-Terminal yoki Codex exec sessiyasidan mustaqil Windows background ishga tushirish uchun tayyor setup/builddan so‘ng `powershell -NoProfile -File scripts/start-background.ps1` ishlating. Yashirin servislarni PID tekshiruvi bilan to‘xtatish: `powershell -NoProfile -File scripts/stop-background.ps1`. Ushbu yo‘lni ishlatayotganda bir xil portlarda `start:local`ni parallel yoqmang.
+`START.cmd` ichida `scripts/start-background.ps1` ishlaydi. U yangi papkadagi Node va bog‘liqliklarni topadi, xizmatlar javob berishini tekshiradi. Yashirin servislar loglari `.data/logs`da saqlanadi. `STOP.cmd` loyiha launcherini PID va buyruq yo‘li orqali tekshiradi. Bir xil portlarda `start:local`ni parallel yoqmang.
 
 ## AI rejimini tanlash
 
@@ -53,6 +57,10 @@ pnpm test:offline
 pnpm check:secrets
 pnpm models:check
 pnpm verify:ml
+pnpm test:seo
+pnpm test:seo:browser
+pnpm production:check
+pnpm test:production
 ```
 
 Integration/E2E testlar lokal server ishlayotganida bajariladi. Oddiy testlar yangi sinov hisoblarini yaratadi; demo testlar esa oldindan `pnpm db:seed` orqali to‘ldirilgan hisoblarni tekshiradi. Faqat demo brauzer oqimlari uchun `pnpm test:demo-ui`. Umumiy testlar pullik tashqi AI’ga surat yubormaydi. Windows E2E o‘rnatilgan Edge’dan foydalanadi; Linuxda `pnpm exec playwright install --with-deps chromium` kerak. ML tekshiruvi:
@@ -64,8 +72,14 @@ services/ml/.venv/Scripts/python.exe -m pytest services/ml/tests -q
 
 `verify:ml` klinik classifier/segmentatsiya/calibration gate’larini tekshiradi; oddiy AI kuzatuvi uni PASS qilmaydi. Haqiqiy bajarilgan tekshiruvlar [test hisobotida](docs/TEST_REPORT.md).
 
-## Docker va server
+## SEO va Docker ishlatmasdan production
 
-`compose.yaml` PostgreSQL, Redis/BullMQ, private S3-compatible storage, API/worker, ML, web va Mailpitni ajratadi. Windows lokal rejimi private filesystem adapter va PostgreSQL durable job runner ishlatadi; u S3 yoki Redis bor deb taqdim etilmaydi. Bu muhitda Docker mavjud bo‘lmagani uchun container ishga tushirish alohida tekshiruv talab qiladi. [Deployment](docs/DEPLOYMENT.md).
+Kelajakdagi domen: **`https://dermatologai.uz`**. Hozir domen faqat konfiguratsiya uchun ishlatiladi: server, DNS va TLS ulanmagan. `VITE_ALLOW_INDEXING=false` qoladi; jonli sayt tayyor bo‘lgach yo‘riqnoma bo‘yicha alohida yoqiladi.
+
+Ochiq to‘rtta sahifa statik HTML sifatida build qilinadi. Har birida title/description, canonical, Open Graph/Twitter va tegishli JSON-LD mavjud. Shaxsiy kabinet, autentifikatsiya, API va noma’lum sahifalar indekslanmaydi. [SEO sozlamalari va tekshiruvlari](docs/SEO.md).
+
+`infra/native` va `scripts/production-*.mjs` Linux serverida Node.js, Python, PostgreSQL, Redis, Nginx va systemd orqali joylashtirish uchun tayyorlangan. Alohida API/worker/ML xizmatlari, TLS reverse proxy shabloni, muhit tekshiruvi, encrypted backup va alohida bazaga restore mavjud. Lokal Windows rejimi private filesystem va PostgreSQL job runner bilan ishlaydi; production uchun Redis alohida talab qilinadi. Server berilmagani sababli Linux deployment, TLS va real backup/restore amalda hali bajarilmagan. [Production yo‘riqnomasi](docs/DEPLOYMENT.md).
+
+Oldingi `compose.yaml` tarixiy konfiguratsiya sifatida qolgan; joriy ishga tushirish va production yo‘li undan foydalanmaydi. [Ko‘chirish va yakuniy tekshiruv hisoboti](docs/RESTART_AND_SEO_REPORT.md).
 
 Secretlarni Gitga qo‘shmang. `.env`, `.data`, datasetlar va model vaznlari ignore qilinadi. API faqat ownerga tegishli ma’lumotni qaytaradi; maxfiy suratlar static/public route orqali ochilmaydi. [Maxfiylik va retention](docs/PRIVACY_AND_RETENTION.md).

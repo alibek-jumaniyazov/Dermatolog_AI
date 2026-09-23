@@ -1,0 +1,40 @@
+[Unit]
+Description=Dermatolog AI private Python visual analysis
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=dermatologai
+Group=dermatologai
+WorkingDirectory=/opt/dermatologai/current/services/ml
+# Only ML/provider settings; database and SMTP credentials are excluded.
+EnvironmentFile=/etc/dermatologai/ml.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/dermatologai/current/services/ml/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --no-access-log
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=100
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryMax=2G
+TasksMax=128
+CPUQuota=200%
+StandardOutput=journal
+StandardError=journal
+LogNamespace=dermatologai
+
+[Install]
+WantedBy=multi-user.target

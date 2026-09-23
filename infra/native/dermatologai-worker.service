@@ -1,0 +1,40 @@
+[Unit]
+Description=Dermatolog AI durable inference and deletion worker
+After=network-online.target postgresql.service redis-server.service dermatologai-ml.service
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=dermatologai
+Group=dermatologai
+WorkingDirectory=/opt/dermatologai/current
+EnvironmentFile=/etc/dermatologai/app.env
+Environment=RUN_WORKER_IN_API=false
+Environment=WORKER_ONLY=true
+ExecStart=/usr/bin/node apps/api/dist/worker.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dermatologai
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryMax=1536M
+TasksMax=128
+CPUQuota=200%
+StandardOutput=journal
+StandardError=journal
+LogNamespace=dermatologai
+
+[Install]
+WantedBy=multi-user.target

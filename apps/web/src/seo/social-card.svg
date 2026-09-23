@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f7f8f0"/>
+  <rect x="830" width="370" height="630" fill="#123f3d"/>
+  <circle cx="1050" cy="315" r="245" fill="none" stroke="#35665a" stroke-width="2"/>
+  <circle cx="1050" cy="315" r="185" fill="none" stroke="#4a7766" stroke-width="2" stroke-dasharray="7 12"/>
+  <path d="M1000 185h100v80h80v100h-80v80h-100v-80h-80V265h80z" fill="#dcebbf"/>
+  <rect x="64" y="63" width="60" height="60" rx="15" fill="#123f3d"/>
+  <path d="M89 76h10v12h12v10H99v12H89V98H77V88h12z" fill="#dcebbf"/>
+  <text x="145" y="88" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#193a35">Raqamli</text>
+  <text x="145" y="117" font-family="Arial,sans-serif" font-size="25" font-weight="700" fill="#193a35">Dermatolog</text>
+  <text x="64" y="230" font-family="Arial,sans-serif" font-size="18" letter-spacing="4" fill="#527958">SHAXSIY TERI KUZATUVI</text>
+  <text x="60" y="316" font-family="Arial,sans-serif" font-size="60" font-weight="700" fill="#193a35">Teringizni yaxshiroq</text>
+  <text x="60" y="386" font-family="Arial,sans-serif" font-size="60" font-weight="700" fill="#68874d">tushuning.</text>
+  <text x="64" y="456" font-family="Arial,sans-serif" font-size="22" fill="#52714d">Surat sifati · AI kuzatuvi · Shaxsiy tarix</text>
+  <path d="M64 512h685" stroke="#d4decc"/>
+  <text x="64" y="556" font-family="Arial,sans-serif" font-size="20" fill="#52714d">Klinik tashxis o‘rnini bosmaydi.</text>
+</svg>

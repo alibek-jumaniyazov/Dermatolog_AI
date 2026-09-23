@@ -26,7 +26,10 @@ if (action === 'stop') {
   let running = false;
   const probe = new Client({ connectionString: maintenanceUrl.toString(), connectionTimeoutMillis: 1500 });
   try { await probe.connect(); running = true; } catch {} finally { await probe.end().catch(() => {}); }
-  if (!running) await run(exe('pg_ctl'), ['-D', data, '-l', path.join(root, '.data/logs/postgres.log'), '-o', `-p ${url.port} -h 127.0.0.1`, '-w', '-t', '20', 'start']);
+  // This helper connects over TCP only. A distro's shared Unix socket directory
+  // may be unwritable by the unprivileged CI user.
+  const socketOptions = win ? '' : " -c unix_socket_directories=''";
+  if (!running) await run(exe('pg_ctl'), ['-D', data, '-l', path.join(root, '.data/logs/postgres.log'), '-o', `-p ${url.port} -h 127.0.0.1${socketOptions}`, '-w', '-t', '20', 'start']);
   const client = new Client({ connectionString: maintenanceUrl.toString() });
   await client.connect();
   try {

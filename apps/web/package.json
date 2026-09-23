@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build --ssr src/seo/prerender.tsx --outDir .seo-build && node scripts/seo-build.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:seo": "node scripts/seo-check.mjs",
+    "test:seo:browser": "node scripts/seo-check.mjs --browser"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.4",

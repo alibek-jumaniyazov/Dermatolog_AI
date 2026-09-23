@@ -8,32 +8,42 @@ import { MlService } from './ml.service';
 import { DeletionService } from './deletion.service';
 import { availableWhere } from './analyses.service';
 import { buildResult } from './risk';
+import { redisConnectionOptions } from './config';
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
   private queue?: Queue;
   private worker?: Worker;
-  private ticking = false;
+  private cycle?: Promise<void>;
+  private stopping = false;
   constructor(private readonly db: PrismaService, private readonly storage: StorageService, private readonly ml: MlService, private readonly deletion: DeletionService) {}
   async onModuleInit() {
     if (process.env.RUN_WORKER_IN_API === 'false' && process.env.WORKER_ONLY !== 'true') return;
     if (process.env.REDIS_URL) {
-      const url = new URL(process.env.REDIS_URL);
-      const connection = { host: url.hostname, port: Number(url.port || 6379), password: url.password || undefined, username: url.username || undefined, db: Number(url.pathname.slice(1) || 0), maxRetriesPerRequest: null, ...(url.protocol === 'rediss:' ? { tls: {} } : {}) };
+      const connection = { ...redisConnectionOptions(process.env.REDIS_URL), maxRetriesPerRequest: null };
       this.queue = new Queue('dermatolog-inference', { connection });
       this.worker = new Worker('dermatolog-inference', async job => { await this.process(String(job.data.jobId)); }, { connection, concurrency: 2 });
       this.worker.on('error', () => console.error(JSON.stringify({ event: 'queue_unavailable' })));
       this.queue.on('error', () => console.error(JSON.stringify({ event: 'queue_unavailable' })));
     }
-    this.timer = setInterval(() => { void this.tick(); }, 1500);
+    this.timer = setInterval(() => { this.scheduleTick(); }, 1500);
     this.timer.unref();
-    void this.tick();
+    this.scheduleTick();
   }
-  async onModuleDestroy() { if (this.timer) clearInterval(this.timer); await this.worker?.close(); await this.queue?.close(); }
+  async onModuleDestroy() {
+    this.stopping = true;
+    if (this.timer) clearInterval(this.timer);
+    // Stop new claims, then let already-started inference persist its result before DB closes.
+    await this.worker?.pause(true);
+    await Promise.all([this.cycle, this.worker?.close()]);
+    await this.queue?.close();
+  }
+  private scheduleTick() {
+    if (this.stopping || this.cycle) return;
+    this.cycle = this.tick().finally(() => { this.cycle = undefined; });
+  }
   private async tick() {
-    if (this.ticking) return;
-    this.ticking = true;
     try {
       await this.deletion.cleanup();
       const stale = await this.db.analysisJob.findMany({ where: { status: 'RUNNING', leasedUntil: { lt: new Date() } }, take: 20 });
@@ -47,13 +57,14 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       }
       const jobs = await this.db.analysisJob.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' }, take: 10 });
       for (const job of jobs) {
+        if (this.stopping) break;
         if (this.queue) await this.queue.add('analysis', { jobId: job.id }, { jobId: job.id, removeOnComplete: true, removeOnFail: true });
         else await this.process(job.id);
       }
     } catch { console.error(JSON.stringify({ event: 'worker_cycle_failed' })); }
-    finally { this.ticking = false; }
   }
   async process(jobId: string) {
+    if (this.stopping) return;
     const claim = await this.db.analysisJob.updateMany({ where: { id: jobId, status: 'PENDING' }, data: { status: 'RUNNING', attempts: { increment: 1 }, leasedUntil: new Date(Date.now() + 180000) } });
     if (!claim.count) return;
     const job = await this.db.analysisJob.findUniqueOrThrow({ where: { id: jobId } });

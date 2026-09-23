@@ -2,20 +2,15 @@ name: Software checks
 on: [push, pull_request]
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:17.5
-        env: {POSTGRES_USER: derma, POSTGRES_PASSWORD: ci-only-password, POSTGRES_DB: dermatolog}
-        ports: ['55439:5432']
-        options: --health-cmd "pg_isready -U derma" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      DATABASE_URL: postgresql://derma:ci-only-password@127.0.0.1:55439/dermatolog
       NODE_ENV: development
       HOST: 127.0.0.1
       PORT: '3001'
       APP_ORIGIN: http://localhost:5173
+      VITE_SITE_URL: https://dermatologai.uz
+      VITE_ALLOW_INDEXING: 'false'
       TEST_API_URL: http://127.0.0.1:3001/api/v1
       TEST_WEB_URL: http://localhost:5173
       ML_SERVICE_URL: http://127.0.0.1:8001
@@ -30,6 +25,9 @@ jobs:
       WORKER_ONLY: 'false'
       SMTP_HOST: ''
       TEMP_RETENTION_MINUTES: '60'
+      # Integration/browser fixtures share one loopback IP. Unit tests cover strict rate limits.
+      RATE_LIMIT_AUTH_PER_MINUTE: '240'
+      RATE_LIMIT_API_PER_MINUTE: '2000'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,14 +45,29 @@ jobs:
             console.log(`::add-mask::${value}`);
             appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`);
           }
+          const databasePassword = randomBytes(24).toString('hex');
+          console.log(`::add-mask::${databasePassword}`);
+          appendFileSync(process.env.GITHUB_ENV, `DATABASE_URL=postgresql://derma:${databasePassword}@127.0.0.1:55439/dermatolog\n`);
           mkdirSync('.data/logs', { recursive: true });
           mkdirSync('.data/ci-pids', { recursive: true });
           NODE
+      - name: Start isolated native PostgreSQL without Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_bin=$(pg_config --bindir)
+          test -x "$database_bin/initdb"
+          echo "PG_BIN=$database_bin" >> "$GITHUB_ENV"
+          PG_BIN="$database_bin" node scripts/postgres.mjs start
       - run: pnpm db:migrate
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm production:check
+      - run: pnpm test:production
+      - run: pnpm test:seo
+      - run: pnpm audit --prod --audit-level=high
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install -r services/ml/requirements-dev.txt
@@ -121,6 +134,9 @@ jobs:
               kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
             fi
           done
+      - name: Stop isolated native PostgreSQL
+        if: always()
+        run: node scripts/postgres.mjs stop
       - name: Upload logs and browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
