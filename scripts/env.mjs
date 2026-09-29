@@ -15,6 +15,9 @@ export function run(command, args, options = {}) {
   });
 }
 export function pnpm(args, options = {}) {
+  // Local runtime uses development, but build children must compile production
+  // React/Vite artifacts. Do not change the launcher's own runtime environment.
+  if (args.includes('build')) options = { ...options, env: { ...(options.env || process.env), NODE_ENV: 'production' } };
   // Invoke pnpm's JS entry rather than a command shell, including Windows paths with spaces.
   const entry = process.env.npm_execpath;
   if (entry && /pnpm/.test(entry)) return run(process.execPath, [entry, ...args], options);

@@ -122,7 +122,7 @@ jobs:
           pnpm test:demo
       - name: Run basic browser flows on Chromium desktop and mobile
         # upload.spec.ts requires the separately authorized OpenAI flow; never invoke it in this no-key CI job.
-        run: pnpm exec playwright test tests/e2e/app.spec.ts tests/e2e/demo.spec.ts
+        run: pnpm exec playwright test tests/e2e/app.spec.ts tests/e2e/demo.spec.ts tests/e2e/consent.spec.ts
       - name: Stop only the service groups started by this job
         if: always()
         shell: bash
